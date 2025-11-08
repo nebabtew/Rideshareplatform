@@ -3,6 +3,8 @@ import { projectId } from '../utils/supabase/info';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Button } from './ui/button';
+import { RideConfirmation } from './RideConfirmation';
 import { MapPin, Calendar, Clock, DollarSign, User, Car, UserCheck } from 'lucide-react';
 
 interface HistoryProps {
@@ -14,6 +16,7 @@ export function History({ user }: HistoryProps) {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedRide, setSelectedRide] = useState<any>(null);
 
   useEffect(() => {
     fetchHistory();
@@ -61,9 +64,11 @@ export function History({ user }: HistoryProps) {
 
   const getPaymentLabel = (item: any) => {
     const amount = item.paymentAmount || 0;
+    const type = item.paymentType || 'meal-swipes';
+    
+    if (type === 'free') return 'Free Ride';
     if (amount === 0) return null;
     
-    const type = item.paymentType || 'meal-swipes';
     if (type === 'meal-swipes') {
       return `${amount} meal swipe${amount > 1 ? 's' : ''}`;
     } else if (type === 'dining-dollars') {
@@ -75,7 +80,7 @@ export function History({ user }: HistoryProps) {
 
   const getPaymentIcon = (item: any) => {
     const type = item.paymentType || 'meal-swipes';
-    return type === 'meal-swipes' ? '🍽️' : type === 'dining-dollars' ? '💳' : '💵';
+    return type === 'free' ? '🎁' : type === 'meal-swipes' ? '🍽️' : type === 'dining-dollars' ? '💳' : '💵';
   };
 
   const getStatusBadge = (status: string) => {
@@ -175,6 +180,18 @@ export function History({ user }: HistoryProps) {
                         )}
                       </CardDescription>
                     </CardHeader>
+                    {(ride.status === 'claimed' || ride.status === 'completed') && (
+                      <CardContent>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setSelectedRide(ride)}
+                          className="w-full"
+                        >
+                          View Details
+                        </Button>
+                      </CardContent>
+                    )}
                   </Card>
                 ))}
               </div>
@@ -220,6 +237,18 @@ export function History({ user }: HistoryProps) {
                         )}
                       </CardDescription>
                     </CardHeader>
+                    {(ride.status === 'claimed' || ride.status === 'completed') && (
+                      <CardContent>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setSelectedRide(ride)}
+                          className="w-full"
+                        >
+                          View Details
+                        </Button>
+                      </CardContent>
+                    )}
                   </Card>
                 ))}
               </div>
@@ -309,6 +338,21 @@ export function History({ user }: HistoryProps) {
           )}
         </TabsContent>
       </Tabs>
+
+      {selectedRide && (
+        <RideConfirmation
+          ride={selectedRide}
+          user={user}
+          onClose={() => {
+            setSelectedRide(null);
+            fetchHistory();
+          }}
+          onComplete={() => {
+            setSelectedRide(null);
+            fetchHistory();
+          }}
+        />
+      )}
     </div>
   );
 }

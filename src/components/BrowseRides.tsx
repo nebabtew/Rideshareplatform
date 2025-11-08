@@ -3,6 +3,7 @@ import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
+import { RideConfirmation } from './RideConfirmation';
 import { MapPin, Calendar, Clock, User, RefreshCw, Mail, Phone } from 'lucide-react';
 
 interface BrowseRidesProps {
@@ -14,6 +15,7 @@ export function BrowseRides({ user }: BrowseRidesProps) {
   const [loading, setLoading] = useState(true);
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [selectedRide, setSelectedRide] = useState<any>(null);
 
   useEffect(() => {
     fetchRides();
@@ -67,6 +69,9 @@ export function BrowseRides({ user }: BrowseRidesProps) {
         throw new Error(data.error || 'Failed to claim ride');
       }
 
+      // Show confirmation dialog
+      setSelectedRide(data.ride);
+      
       // Refresh rides list
       await fetchRides();
     } catch (err: any) {
@@ -92,9 +97,11 @@ export function BrowseRides({ user }: BrowseRidesProps) {
 
   const getPaymentLabel = (ride: any) => {
     const amount = ride.paymentAmount || 0;
+    const type = ride.paymentType || 'meal-swipes';
+    
+    if (type === 'free') return 'Free Ride';
     if (amount === 0) return null;
     
-    const type = ride.paymentType || 'meal-swipes';
     if (type === 'meal-swipes') {
       return `${amount} meal swipe${amount > 1 ? 's' : ''}`;
     } else if (type === 'dining-dollars') {
@@ -106,7 +113,7 @@ export function BrowseRides({ user }: BrowseRidesProps) {
 
   const getPaymentIcon = (ride: any) => {
     const type = ride.paymentType || 'meal-swipes';
-    return type === 'meal-swipes' ? '🍽️' : type === 'dining-dollars' ? '💳' : '💵';
+    return type === 'free' ? '🎁' : type === 'meal-swipes' ? '🍽️' : type === 'dining-dollars' ? '💳' : '💵';
   };
 
   if (loading) {
@@ -187,7 +194,7 @@ export function BrowseRides({ user }: BrowseRidesProps) {
                 {/* Contact Information - only visible to other users, not the ride poster */}
                 {ride.riderId !== user.id && (
                   <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-sm mb-2">Contact Information:</p>
+                    <p className="text-sm mb-2">📞 Contact Information:</p>
                     <div className="space-y-1 text-sm">
                       {ride.riderCollegeEmail && (
                         <div className="flex items-center gap-2 text-gray-700">
@@ -204,6 +211,9 @@ export function BrowseRides({ user }: BrowseRidesProps) {
                             {ride.riderPhone}
                           </a>
                         </div>
+                      )}
+                      {!ride.riderPhone && !ride.riderCollegeEmail && (
+                        <p className="text-gray-500 text-xs">No contact info provided</p>
                       )}
                     </div>
                   </div>
@@ -226,6 +236,21 @@ export function BrowseRides({ user }: BrowseRidesProps) {
             </Card>
           ))}
         </div>
+      )}
+
+      {selectedRide && (
+        <RideConfirmation
+          ride={selectedRide}
+          user={user}
+          onClose={() => {
+            setSelectedRide(null);
+            fetchRides();
+          }}
+          onComplete={() => {
+            setSelectedRide(null);
+            fetchRides();
+          }}
+        />
       )}
     </div>
   );

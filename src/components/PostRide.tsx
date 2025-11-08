@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { MapPin, Calendar, Clock, DollarSign } from 'lucide-react';
+import { MapPin, Calendar, Clock, DollarSign, Phone } from 'lucide-react';
 
 interface PostRideProps {
   user: any;
@@ -16,8 +16,9 @@ export function PostRide({ user }: PostRideProps) {
   const [dropoffLocation, setDropoffLocation] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
-  const [paymentType, setPaymentType] = useState('meal-swipes');
+  const [paymentType, setPaymentType] = useState('free');
   const [paymentAmount, setPaymentAmount] = useState('0');
+  const [phoneOverride, setPhoneOverride] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -43,7 +44,8 @@ export function PostRide({ user }: PostRideProps) {
             date,
             time,
             paymentType,
-            paymentAmount: parseFloat(paymentAmount) || 0
+            paymentAmount: parseFloat(paymentAmount) || 0,
+            phoneOverride: phoneOverride || null
           })
         }
       );
@@ -60,8 +62,9 @@ export function PostRide({ user }: PostRideProps) {
       setDropoffLocation('');
       setDate('');
       setTime('');
-      setPaymentType('meal-swipes');
+      setPaymentType('free');
       setPaymentAmount('0');
+      setPhoneOverride('');
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
@@ -144,6 +147,23 @@ export function PostRide({ user }: PostRideProps) {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="phoneOverride">
+              <Phone className="w-4 h-4 inline mr-2" />
+              Contact Phone Number (Optional)
+            </Label>
+            <Input
+              id="phoneOverride"
+              type="tel"
+              placeholder={user.phone ? `Leave blank to use ${user.phone}` : '(123) 456-7890'}
+              value={phoneOverride}
+              onChange={(e) => setPhoneOverride(e.target.value)}
+            />
+            <p className="text-sm text-gray-500">
+              Drivers will use this number to contact you. {user.phone && 'Leave blank to use your profile phone number.'}
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="paymentType">
               <DollarSign className="w-4 h-4 inline mr-2" />
               Payment Type
@@ -153,6 +173,7 @@ export function PostRide({ user }: PostRideProps) {
                 <SelectValue placeholder="Select payment type" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="free">Free Ride 🎁</SelectItem>
                 <SelectItem value="meal-swipes">Meal Swipes</SelectItem>
                 <SelectItem value="dining-dollars">Dining Dollars</SelectItem>
                 <SelectItem value="cash">Cash</SelectItem>
@@ -160,27 +181,38 @@ export function PostRide({ user }: PostRideProps) {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="paymentAmount">
-              {paymentType === 'meal-swipes' ? 'Number of Meal Swipes' : 
-               paymentType === 'dining-dollars' ? 'Dining Dollars ($)' : 
-               'Cash Amount ($)'} (optional)
-            </Label>
-            <Input
-              id="paymentAmount"
-              type="number"
-              min="0"
-              step={paymentType === 'meal-swipes' ? '1' : '0.01'}
-              placeholder="0"
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(e.target.value)}
-            />
-            <p className="text-sm text-gray-500">
-              {paymentType === 'meal-swipes' ? 
-                'Offer meal swipes as payment. This creates a tracked promise for integrity.' :
-                'Specify the amount you\'re offering as payment for the ride.'}
-            </p>
-          </div>
+          {paymentType !== 'free' && (
+            <div className="space-y-2">
+              <Label htmlFor="paymentAmount">
+                {paymentType === 'meal-swipes' ? 'Number of Meal Swipes' : 
+                 paymentType === 'dining-dollars' ? 'Dining Dollars ($)' : 
+                 'Cash Amount ($)'} (optional)
+              </Label>
+              <Input
+                id="paymentAmount"
+                type="number"
+                min="0"
+                step={paymentType === 'meal-swipes' ? '1' : '0.01'}
+                placeholder="0"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+              />
+              <p className="text-sm text-gray-500">
+                {paymentType === 'meal-swipes' ? 
+                  'Offer meal swipes as payment. This creates a tracked promise for integrity.' :
+                  'Specify the amount you\'re offering as payment for the ride.'}
+              </p>
+            </div>
+          )}
+
+          {paymentType === 'free' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Free Ride:</strong> You've selected a free ride option. This is perfect for casual carpools, 
+                helping friends, or when you just want to share the journey with fellow students. No payment required!
+              </p>
+            </div>
+          )}
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">

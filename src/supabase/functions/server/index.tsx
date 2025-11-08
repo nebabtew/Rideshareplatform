@@ -113,7 +113,7 @@ app.post('/make-server-6f95a428/rides', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    const { pickupLocation, dropoffLocation, date, time, paymentType, paymentAmount } = await c.req.json();
+    const { pickupLocation, dropoffLocation, date, time, paymentType, paymentAmount, phoneOverride } = await c.req.json();
 
     if (!pickupLocation || !dropoffLocation || !date || !time) {
       return c.json({ error: 'All fields are required' }, 400);
@@ -122,12 +122,15 @@ app.post('/make-server-6f95a428/rides', async (c) => {
     // Get user profile for contact info
     const userProfile = await kv.get(`user:${user.id}`);
 
+    // Use phoneOverride if provided, otherwise use profile phone
+    const contactPhone = phoneOverride || user.user_metadata?.phone || userProfile?.phone || '';
+
     const rideId = `ride:${Date.now()}:${user.id}`;
     const ride = {
       id: rideId,
       riderId: user.id,
       riderName: user.user_metadata?.name,
-      riderPhone: user.user_metadata?.phone || userProfile?.phone || '',
+      riderPhone: contactPhone,
       riderCollegeEmail: user.user_metadata?.collegeEmail || userProfile?.collegeEmail || '',
       pickupLocation,
       dropoffLocation,
@@ -140,7 +143,9 @@ app.post('/make-server-6f95a428/rides', async (c) => {
       status: 'open', // open, claimed, completed, cancelled
       createdAt: new Date().toISOString(),
       driverId: null,
-      driverName: null
+      driverName: null,
+      driverPhone: null,
+      driverCollegeEmail: null
     };
 
     console.log('Creating ride:', rideId);
@@ -206,12 +211,17 @@ app.post('/make-server-6f95a428/rides/:rideId/claim', async (c) => {
       return c.json({ error: 'You cannot claim your own ride request' }, 400);
     }
 
+    // Get driver profile for contact info
+    const driverProfile = await kv.get(`user:${user.id}`);
+
     // Update ride with driver info
     const updatedRide = {
       ...ride,
       status: 'claimed',
       driverId: user.id,
       driverName: user.user_metadata?.name,
+      driverPhone: user.user_metadata?.phone || driverProfile?.phone || '',
+      driverCollegeEmail: user.user_metadata?.collegeEmail || driverProfile?.collegeEmail || '',
       claimedAt: new Date().toISOString()
     };
 
@@ -311,6 +321,120 @@ app.get('/make-server-6f95a428/my-rides', async (c) => {
   } catch (error) {
     console.log('Get my rides error:', error);
     return c.json({ error: 'Failed to get rides' }, 500);
+  }
+});
+
+// Complete a ride
+app.post('/make-server-6f95a428/rides/:rideId/complete', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    
+    if (!accessToken) {
+      return c.json({ error: 'No token provided' }, 401);
+    }
+
+    const supabase = getSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const rideId = c.req.param('rideId');
+    const ride = await kv.get(rideId);
+
+    if (!ride) {
+      return c.json({ error: 'Ride not found' }, 404);
+    }
+
+    if (ride.status !== 'claimed') {
+      return c.json({ error: 'Ride is not in a claimable state' }, 400);
+    }
+
+    if (ride.riderId !== user.id && ride.driverId !== user.id) {
+      return c.json({ error: 'You are not part of this ride' }, 403);
+    }
+
+    // Update ride to completed
+    const updatedRide = {
+      ...ride,
+      status: 'completed',
+      completedAt: new Date().toISOString()
+    };
+
+    await kv.set(rideId, updatedRide);
+
+    return c.json({ success: true, ride: updatedRide });
+  } catch (error) {
+    console.error('Complete ride error:', error);
+    return c.json({ error: 'Failed to complete ride' }, 500);
+  }
+});
+
+// Rate a ride
+app.post('/make-server-6f95a428/rides/:rideId/rate', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    
+    if (!accessToken) {
+      return c.json({ error: 'No token provided' }, 401);
+    }
+
+    const supabase = getSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const rideId = c.req.param('rideId');
+    const { rating } = await c.req.json();
+
+    if (!rating || rating < 1 || rating > 5) {
+      return c.json({ error: 'Invalid rating. Must be between 1 and 5' }, 400);
+    }
+
+    const ride = await kv.get(rideId);
+
+    if (!ride) {
+      return c.json({ error: 'Ride not found' }, 404);
+    }
+
+    if (ride.riderId !== user.id && ride.driverId !== user.id) {
+      return c.json({ error: 'You are not part of this ride' }, 403);
+    }
+
+    // Determine who is being rated
+    const isDriver = ride.driverId === user.id;
+    const ratedUserId = isDriver ? ride.riderId : ride.driverId;
+
+    // Save rating
+    const ratingId = `rating:${rideId}:${user.id}`;
+    const ratingData = {
+      id: ratingId,
+      rideId,
+      raterId: user.id,
+      raterName: user.user_metadata?.name,
+      ratedUserId,
+      ratedUserName: isDriver ? ride.riderName : ride.driverName,
+      rating,
+      createdAt: new Date().toISOString()
+    };
+
+    await kv.set(ratingId, ratingData);
+
+    // Mark ride as rated by this user
+    const updatedRide = {
+      ...ride,
+      [`rated_by_${user.id}`]: true
+    };
+
+    await kv.set(rideId, updatedRide);
+
+    return c.json({ success: true, rating: ratingData });
+  } catch (error) {
+    console.error('Rate ride error:', error);
+    return c.json({ error: 'Failed to submit rating' }, 500);
   }
 });
 
