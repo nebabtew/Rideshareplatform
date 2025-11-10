@@ -1,7 +1,7 @@
 
   # Ride Share Platform
 
-  This is a code bundle for Ride Share Platform. The original project is available at https://www.figma.com/design/iYdY77F8onXkS2jG8C8SkH/Ride-Share-Platform.
+  This is a code bundle for Ride Share Platform. The original project is available at [sand.truman.edu.](https://sand.truman.edu/acm/rideshare/)
 
   ## Running the code
 
